@@ -1,6 +1,7 @@
 package me.touchie771.voting.utils;
 
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -10,6 +11,29 @@ public abstract class PollManager {
 
     private static final Set<Poll> pollSet = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, Poll> pollMap = new ConcurrentHashMap<>();
+    private static PollSerializer serializer;
+
+    public static void initialize(JavaPlugin plugin) {
+        PollManager.serializer = new PollSerializer(plugin);
+        loadPolls();
+    }
+    
+    public static void savePolls() {
+        if (serializer != null) {
+            serializer.savePolls(new ArrayList<>(pollSet));
+        }
+    }
+    
+    private static void loadPolls() {
+        if (serializer == null) return;
+        
+        List<PollSerializer.PollData> pollDataList = serializer.loadPolls();
+        for (PollSerializer.PollData pollData : pollDataList) {
+            Poll poll = pollData.toPoll();
+            pollSet.add(poll);
+            pollMap.put(poll.getId(), poll);
+        }
+    }
 
     public static PollBuilder getBuilder() {
         return new PollBuilder();
@@ -44,6 +68,7 @@ public abstract class PollManager {
         Optional<Poll> pollOpt = getPollById(pollId);
         if (pollOpt.isPresent()) {
             pollOpt.get().start();
+            savePolls();
             return true;
         }
         return false;
@@ -53,6 +78,7 @@ public abstract class PollManager {
         Optional<Poll> pollOpt = getPollById(pollId);
         if (pollOpt.isPresent()) {
             pollOpt.get().stop();
+            savePolls();
             return true;
         }
         return false;
@@ -60,12 +86,26 @@ public abstract class PollManager {
 
     public static boolean vote(String pollId, Player player, int optionIndex) {
         Optional<Poll> pollOpt = getPollById(pollId);
-        return pollOpt.map(poll -> poll.vote(player, optionIndex)).orElse(false);
+        if (pollOpt.isPresent()) {
+            boolean result = pollOpt.get().vote(player, optionIndex);
+            if (result) {
+                savePolls();
+            }
+            return result;
+        }
+        return false;
     }
 
     public static boolean unvote(String pollId, Player player) {
         Optional<Poll> pollOpt = getPollById(pollId);
-        return pollOpt.map(poll -> poll.unvote(player)).orElse(false);
+        if (pollOpt.isPresent()) {
+            boolean result = pollOpt.get().unvote(player);
+            if (result) {
+                savePolls();
+            }
+            return result;
+        }
+        return false;
     }
 
     public static class PollBuilder {
@@ -116,6 +156,7 @@ public abstract class PollManager {
 
             pollSet.add(poll);
             pollMap.put(poll.getId(), poll);
+            savePolls();
             return poll;
         }
 
@@ -161,6 +202,19 @@ public abstract class PollManager {
             this.votes = new ConcurrentHashMap<>();
             this.active = false;
         }
+        
+        public Poll(PollSerializer.PollData pollData) {
+            this.id = pollData.id();
+            this.name = pollData.name();
+            this.duration = pollData.duration();
+            this.creatorId = pollData.creatorId();
+            this.creatorName = pollData.creatorName();
+            this.options = List.copyOf(pollData.options());
+            this.votes = new ConcurrentHashMap<>(pollData.votes());
+            this.active = pollData.active();
+            this.startTime = pollData.startTime();
+            this.endTime = pollData.endTime();
+        }
 
         public void start() {
             if (!active) {
@@ -194,10 +248,6 @@ public abstract class PollManager {
             return (int) votes.values().stream()
                     .filter(option -> option == optionIndex)
                     .count();
-        }
-
-        public boolean isExpired() {
-            return active && System.currentTimeMillis() > endTime;
         }
 
         public String getShortId() {

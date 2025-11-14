@@ -7,6 +7,7 @@ import dev.rollczi.litecommands.annotations.execute.Execute;
 import dev.rollczi.litecommands.annotations.permission.Permission;
 import dev.rollczi.litecommands.annotations.quoted.Quoted;
 import me.touchie771.voting.utils.PollManager;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.entity.Player;
 
 import java.util.Arrays;
@@ -15,6 +16,12 @@ import java.util.List;
 @Command(name = "poll")
 @Permission("voting.poll")
 public class PollCommand {
+    
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    
+    private void sendMessage(Player player, String message) {
+        player.sendMessage(MINI_MESSAGE.deserialize(message));
+    }
 
     @Execute(name = "create")
     public void create(@Context Player player, @Arg @Quoted String question, @Arg @Quoted String options) {
@@ -24,8 +31,8 @@ public class PollCommand {
                 .toList();
         
         if (optionList.size() < 2) {
-            player.sendMessage("§cPoll must have at least 2 options separated by commas!");
-            player.sendMessage("§7Usage: /poll create \"question\" \"option1, option2, option3\"");
+            sendMessage(player, "<red>Poll must have at least 2 options separated by commas!</red>");
+            sendMessage(player, "<gray>Usage: /poll create \"question\" \"option1, option2, option3\"</gray>");
             return;
         }
 
@@ -37,30 +44,30 @@ public class PollCommand {
                     .options(optionList)
                     .build();
 
-            player.sendMessage("§aPoll created successfully!");
-            player.sendMessage("§7Poll ID: §f" + poll.getShortId());
-            player.sendMessage("§7Question: §f" + question);
-            player.sendMessage("§7Use §e/poll start " + poll.getShortId() + " §7to begin voting.");
+            sendMessage(player, "<green>Poll created successfully!</green>");
+            sendMessage(player, "<gray>Poll ID: </gray><white>" + poll.getShortId() + "</white>");
+            sendMessage(player, "<gray>Question: </gray><white>" + question + "</white>");
+            sendMessage(player, "<gray>Use </gray><yellow>/poll start " + poll.getShortId() + "</yellow><gray> to begin voting.</gray>");
         } catch (IllegalArgumentException e) {
-            player.sendMessage("§cError: " + e.getMessage());
+            sendMessage(player, "<red>Error: </red><white>" + e.getMessage() + "</white>");
         }
     }
 
     private void withPoll(String pollId, Player player, java.util.function.BiConsumer<PollManager.Poll, Player> action) {
         PollManager.getPollById(pollId).ifPresentOrElse(poll -> action.accept(poll, player), 
-            () -> player.sendMessage("§cPoll not found: " + pollId));
+            () -> sendMessage(player, "<red>Poll not found: </red><white>" + pollId + "</white>"));
     }
 
     private void withPollAccess(Player player, String pollId, java.util.function.BiConsumer<PollManager.Poll, Player> action) {
         PollManager.getPollById(pollId).map(poll -> {
             if (!poll.getCreatorId().equals(player.getUniqueId())) {
-                player.sendMessage("§cYou can only manage your own polls!");
+                sendMessage(player, "<red>You can only manage your own polls!</red>");
                 return null;
             }
             action.accept(poll, player);
             return poll;
         }).orElseGet(() -> {
-            player.sendMessage("§cPoll not found: " + pollId);
+            sendMessage(player, "<red>Poll not found: </red><white>" + pollId + "</white>");
             return null;
         });
     }
@@ -69,9 +76,9 @@ public class PollCommand {
     public void start(@Context Player player, @Arg String pollId) {
         withPollAccess(player, pollId, (poll, p) -> {
             if (PollManager.startPoll(pollId)) {
-                p.sendMessage("§aPoll started: " + pollId);
+                sendMessage(p, "<green>Poll started: </green><white>" + pollId + "</white>");
             } else {
-                p.sendMessage("§cFailed to start poll: " + pollId);
+                sendMessage(p, "<red>Failed to start poll: </red><white>" + pollId + "</white>");
             }
         });
     }
@@ -80,9 +87,9 @@ public class PollCommand {
     public void stop(@Context Player player, @Arg String pollId) {
         withPollAccess(player, pollId, (poll, p) -> {
             if (PollManager.stopPoll(pollId)) {
-                p.sendMessage("§aPoll stopped: " + pollId);
+                sendMessage(p, "<green>Poll stopped: </green><white>" + pollId + "</white>");
             } else {
-                p.sendMessage("§cFailed to stop poll: " + pollId);
+                sendMessage(p, "<red>Failed to stop poll: </red><white>" + pollId + "</white>");
             }
         });
     }
@@ -90,7 +97,7 @@ public class PollCommand {
     @Execute(name = "vote")
     public void vote(@Context Player player, @Arg String pollId, @Arg int optionNumber) {
         if (optionNumber < 1) {
-            player.sendMessage("§cOption number must be positive!");
+            sendMessage(player, "<red>Option number must be positive!</red>");
             return;
         }
         
@@ -98,18 +105,18 @@ public class PollCommand {
         
         withPoll(pollId, player, (poll, p) -> {
             if (!poll.isActive()) {
-                p.sendMessage("§cThis poll is not active!");
+                sendMessage(p, "<red>This poll is not active!</red>");
                 return;
             }
             
             if (poll.hasVoted(p)) {
-                p.sendMessage("§eYou already voted! Your vote has been changed.");
+                sendMessage(p, "<yellow>You already voted! Your vote has been changed.</yellow>");
             }
             
             if (PollManager.vote(pollId, p, optionIndex)) {
-                p.sendMessage("§aVote cast for option " + optionNumber);
+                sendMessage(p, "<green>Vote cast for option </green><white>" + optionNumber + "</white>");
             } else {
-                p.sendMessage("§cInvalid option number!");
+                sendMessage(p, "<red>Invalid option number!</red>");
             }
         });
     }
@@ -118,9 +125,9 @@ public class PollCommand {
     public void unvote(@Context Player player, @Arg String pollId) {
         withPoll(pollId, player, (poll, p) -> {
             if (PollManager.unvote(pollId, p)) {
-                p.sendMessage("§aYour vote has been removed.");
+                sendMessage(p, "<green>Your vote has been removed.</green>");
             } else {
-                p.sendMessage("§cYou haven't voted in this poll.");
+                sendMessage(p, "<red>You haven't voted in this poll.</red>");
             }
         });
     }
@@ -128,25 +135,25 @@ public class PollCommand {
     @Execute(name = "stats")
     public void stats(@Context Player player, @Arg String pollId) {
         withPoll(pollId, player, (poll, p) -> {
-            p.sendMessage("§6=== Poll Stats ===");
-            p.sendMessage("§7ID: §f" + poll.getShortId());
-            p.sendMessage("§7Question: §f" + poll.getName());
-            p.sendMessage("§7Creator: §f" + poll.getCreatorName());
-            p.sendMessage("§7Status: " + (poll.isActive() ? "§aActive" : "§cInactive"));
+            sendMessage(p, "<gold>=== Poll Stats ===</gold>");
+            sendMessage(p, "<gray>ID: </gray><white>" + poll.getShortId() + "</white>");
+            sendMessage(p, "<gray>Question: </gray><white>" + poll.getName() + "</white>");
+            sendMessage(p, "<gray>Creator: </gray><white>" + poll.getCreatorName() + "</white>");
+            sendMessage(p, "<gray>Status: </gray>" + (poll.isActive() ? "<green>Active</green>" : "<red>Inactive</red>"));
             
             if (poll.isActive()) {
                 long timeLeft = (poll.getEndTime() - System.currentTimeMillis()) / 1000;
-                p.sendMessage("§7Time left: §f" + timeLeft + " seconds");
+                sendMessage(p, "<gray>Time left: </gray><white>" + timeLeft + " seconds</white>");
             }
             
-            p.sendMessage("§7Options:");
+            sendMessage(p, "<gray>Options:</gray>");
             for (int i = 0; i < poll.getOptions().size(); i++) {
                 int votes = poll.getVoteCount(i);
                 String option = poll.getOptions().get(i);
-                p.sendMessage("§f" + (i + 1) + ". §7" + option + " §8(§f" + votes + " votes§8)");
+                sendMessage(p, "<white>" + (i + 1) + ". </white><gray>" + option + " </gray><dark_gray>(</dark_gray><white>" + votes + " votes</white><dark_gray>)</dark_gray>");
             }
             
-            p.sendMessage("§7Total votes: §f" + poll.getVotes().size());
+            sendMessage(p, "<gray>Total votes: </gray><white>" + poll.getVotes().size() + "</white>");
         });
     }
 
@@ -155,14 +162,14 @@ public class PollCommand {
         List<PollManager.Poll> playerPolls = PollManager.getPollsByCreator(player);
         
         if (playerPolls.isEmpty()) {
-            player.sendMessage("§7You haven't created any polls.");
+            sendMessage(player, "<gray>You haven't created any polls.</gray>");
             return;
         }
         
-        player.sendMessage("§6=== Your Polls ===");
+        sendMessage(player, "<gold>=== Your Polls ===</gold>");
         for (PollManager.Poll poll : playerPolls) {
-            String status = poll.isActive() ? "§aActive" : "§cInactive";
-            player.sendMessage("§7" + poll.getShortId() + " - " + status + " - " + poll.getName());
+            String status = poll.isActive() ? "<green>Active</green>" : "<red>Inactive</red>";
+            sendMessage(player, "<gray>" + poll.getShortId() + " - </gray>" + status + "<gray> - </gray><white>" + poll.getName() + "</white>");
         }
     }
 
@@ -171,14 +178,14 @@ public class PollCommand {
         List<PollManager.Poll> activePolls = PollManager.getActivePolls();
         
         if (activePolls.isEmpty()) {
-            player.sendMessage("§7No active polls on the server.");
+            sendMessage(player, "<gray>No active polls on the server.</gray>");
             return;
         }
         
-        player.sendMessage("§6=== Active Server Polls ===");
+        sendMessage(player, "<gold>=== Active Server Polls ===</gold>");
         for (PollManager.Poll poll : activePolls) {
             long timeLeft = (poll.getEndTime() - System.currentTimeMillis()) / 1000;
-            player.sendMessage("§7" + poll.getShortId() + " - " + poll.getName() + " §8(§f" + timeLeft + "s left§8)");
+            sendMessage(player, "<gray>" + poll.getShortId() + " - </gray><white>" + poll.getName() + "</white><dark_gray> (</dark_gray><white>" + timeLeft + "s left</white><dark_gray>)</dark_gray>");
         }
     }
 }
