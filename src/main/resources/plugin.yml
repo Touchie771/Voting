@@ -1,0 +1,6 @@
+name: Voting
+version: '1.0.0'
+main: me.touchie771.voting.Voting
+api-version: '1.21'
+authors: [ Touchie771 ]
+description: A plugin that allows players to vote.
