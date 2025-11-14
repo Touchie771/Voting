@@ -13,15 +13,10 @@ repositories {
         name = "papermc-repo"
         url = "https://repo.papermc.io/repository/maven-public/"
     }
-    maven {
-        name = "litecommands-repo"
-        url = "https://repo.panda-lang.org/releases/"
-    }
 }
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
-    implementation("dev.rollczi:litecommands-bukkit:3.9.2")
 }
 
 tasks {

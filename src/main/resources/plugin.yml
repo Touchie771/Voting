@@ -4,3 +4,8 @@ main: me.touchie771.voting.Voting
 api-version: '1.21'
 authors: [ Touchie771 ]
 description: A plugin that allows players to vote in polls.
+commands:
+  poll:
+    description: Create and manage polls
+    usage: /poll <create|start|stop|vote|unvote|stats|list>
+    permission: voting.poll
