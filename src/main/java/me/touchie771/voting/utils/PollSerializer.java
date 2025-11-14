@@ -77,23 +77,23 @@ public class PollSerializer {
                            long endTime) {
 
         public static PollData fromPoll(PollManager.Poll poll) {
-                return new PollData(
-                        poll.getId(),
-                        poll.getCustomId(),
-                        poll.getName(),
-                        poll.getDuration(),
-                        poll.getCreatorId(),
-                        poll.getCreatorName(),
-                        poll.getOptions(),
-                        poll.getVotes(),
-                        poll.isActive(),
-                        poll.getStartTime(),
-                        poll.getEndTime()
-                );
-            }
+            return new PollData(
+                    poll.getId(),
+                    poll.getCustomId(),
+                    poll.getName(),
+                    poll.getDuration(),
+                    poll.getCreatorId(),
+                    poll.getCreatorName(),
+                    poll.getOptions(),
+                    poll.getVotes(),
+                    poll.isActive(),
+                    poll.getStartTime(),
+                    poll.getEndTime()
+            );
+        }
 
         public PollManager.Poll toPoll() {
-                return new PollManager.Poll(this);
-            }
+            return new PollManager.Poll(this);
         }
+    }
 }
