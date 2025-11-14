@@ -11,7 +11,13 @@ public abstract class PollManager {
 
     private static final Set<Poll> pollSet = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, Poll> pollMap = new ConcurrentHashMap<>();
+    private static final Map<String, Poll> customIdMap = new ConcurrentHashMap<>();
     private static PollSerializer serializer;
+    
+    // Reserved command names that cannot be used as poll IDs
+    private static final Set<String> RESERVED_IDS = Set.of(
+        "list", "active", "create", "start", "stop", "vote", "unvote", "stats"
+    );
 
     public static void initialize(JavaPlugin plugin) {
         PollManager.serializer = new PollSerializer(plugin);
@@ -32,6 +38,11 @@ public abstract class PollManager {
             Poll poll = pollData.toPoll();
             pollSet.add(poll);
             pollMap.put(poll.getId(), poll);
+            
+            // Add to customIdMap if customId is not null (for backward compatibility)
+            if (poll.getCustomId() != null && !poll.getCustomId().trim().isEmpty()) {
+                customIdMap.put(poll.getCustomId().toLowerCase(), poll);
+            }
         }
     }
 
@@ -40,7 +51,13 @@ public abstract class PollManager {
     }
 
     public static Optional<Poll> getPollById(String pollId) {
-        // Try full UUID first
+        // Try custom ID first
+        Poll customPoll = customIdMap.get(pollId.toLowerCase());
+        if (customPoll != null) {
+            return Optional.of(customPoll);
+        }
+        
+        // Try full UUID
         try {
             UUID uuid = UUID.fromString(pollId);
             return Optional.ofNullable(pollMap.get(uuid));
@@ -55,12 +72,6 @@ public abstract class PollManager {
     public static List<Poll> getPollsByCreator(Player player) {
         return pollSet.stream()
                 .filter(poll -> poll.getCreatorId().equals(player.getUniqueId()))
-                .toList();
-    }
-
-    public static List<Poll> getActivePolls() {
-        return pollSet.stream()
-                .filter(Poll::isActive)
                 .toList();
     }
 
@@ -109,11 +120,17 @@ public abstract class PollManager {
     }
 
     public static class PollBuilder {
+        private String customId;
         private String name;
         private long duration;
         private UUID creatorId;
         private String creatorName;
         private List<String> options = new ArrayList<>();
+
+        public PollBuilder customId(String customId) {
+            this.customId = customId.toLowerCase().trim(); // Auto-normalize to lowercase
+            return this;
+        }
 
         public PollBuilder name(String name) {
             this.name = name;
@@ -137,6 +154,15 @@ public abstract class PollManager {
         }
 
         public Poll build() {
+            if (customId == null || customId.trim().isEmpty()) {
+                throw new IllegalArgumentException("Poll custom ID cannot be empty");
+            }
+            if (!customId.matches("^[a-z0-9_-]{3,16}$")) {
+                throw new IllegalArgumentException("Poll ID must be 3-16 characters: lowercase letters, numbers, underscores, and hyphens only");
+            }
+            if (RESERVED_IDS.contains(customId)) {
+                throw new IllegalArgumentException("Poll ID '" + customId + "' is reserved and cannot be used");
+            }
             if (name == null || name.trim().isEmpty()) {
                 throw new IllegalArgumentException("Poll name cannot be empty");
             }
@@ -151,13 +177,32 @@ public abstract class PollManager {
                 throw new IllegalArgumentException("Poll options must be unique");
             }
             
+            // Check for custom ID collision
+            String normalizedId = getString();
+
             // Create poll first to get short ID
             Poll poll = getPoll();
 
             pollSet.add(poll);
             pollMap.put(poll.getId(), poll);
+            customIdMap.put(normalizedId, poll);
             savePolls();
             return poll;
+        }
+
+        private @NotNull String getString() {
+            String normalizedId = customId.toLowerCase();
+            if (customIdMap.containsKey(normalizedId)) {
+                throw new IllegalArgumentException("Poll ID '" + customId + "' is already in use");
+            }
+
+            // Check for collision with existing short IDs
+            for (Poll existingPoll : pollSet) {
+                if (existingPoll.getShortId().equals(normalizedId)) {
+                    throw new IllegalArgumentException("Poll ID '" + customId + "' conflicts with an existing poll's short ID");
+                }
+            }
+            return normalizedId;
         }
 
         private @NotNull Poll getPoll() {
@@ -182,6 +227,7 @@ public abstract class PollManager {
 
     public static class Poll {
         private final UUID id;
+        private final String customId;
         private final String name;
         private final long duration;
         private final UUID creatorId;
@@ -194,6 +240,7 @@ public abstract class PollManager {
 
         public Poll(PollBuilder pollBuilder) {
             this.id = UUID.randomUUID();
+            this.customId = pollBuilder.customId;
             this.name = pollBuilder.name;
             this.duration = pollBuilder.duration;
             this.creatorId = pollBuilder.creatorId;
@@ -205,6 +252,7 @@ public abstract class PollManager {
         
         public Poll(PollSerializer.PollData pollData) {
             this.id = pollData.id();
+            this.customId = pollData.customId();
             this.name = pollData.name();
             this.duration = pollData.duration();
             this.creatorId = pollData.creatorId();
@@ -260,6 +308,10 @@ public abstract class PollManager {
 
         public String getName() {
             return name;
+        }
+
+        public String getCustomId() {
+            return customId;
         }
 
         public long getDuration() {

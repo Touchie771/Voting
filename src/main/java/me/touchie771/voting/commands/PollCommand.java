@@ -24,7 +24,7 @@ public class PollCommand {
     }
 
     @Execute(name = "create")
-    public void create(@Context Player player, @Arg @Quoted String question, @Arg @Quoted String options) {
+    public void create(@Context Player player, @Arg String pollId, @Arg @Quoted String question, @Arg @Quoted String options) {
         List<String> optionList = Arrays.stream(options.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -32,12 +32,14 @@ public class PollCommand {
         
         if (optionList.size() < 2) {
             sendMessage(player, "<red>Poll must have at least 2 options separated by commas!</red>");
-            sendMessage(player, "<gray>Usage: /poll create \"question\" \"option1, option2, option3\"</gray>");
+            sendMessage(player, "<gray>Usage: /poll create <id> \"question\" \"option1, option2, option3\"</gray>");
+            sendMessage(player, "<gray>ID must be 3-16 characters: lowercase letters, numbers, underscores, and hyphens only</gray>");
             return;
         }
 
         try {
             PollManager.Poll poll = PollManager.getBuilder()
+                    .customId(pollId)
                     .name(question)
                     .duration(5 * 60 * 1000L)
                     .creator(player)
@@ -45,9 +47,9 @@ public class PollCommand {
                     .build();
 
             sendMessage(player, "<green>Poll created successfully!</green>");
-            sendMessage(player, "<gray>Poll ID: </gray><white>" + poll.getShortId() + "</white>");
+            sendMessage(player, "<gray>Poll ID: </gray><white>" + poll.getCustomId() + "</white>");
             sendMessage(player, "<gray>Question: </gray><white>" + question + "</white>");
-            sendMessage(player, "<gray>Use </gray><yellow>/poll start " + poll.getShortId() + "</yellow><gray> to begin voting.</gray>");
+            sendMessage(player, "<gray>Use </gray><yellow>/poll start " + poll.getCustomId() + "</yellow><gray> to begin voting.</gray>");
         } catch (IllegalArgumentException e) {
             sendMessage(player, "<red>Error: </red><white>" + e.getMessage() + "</white>");
         }
@@ -137,6 +139,9 @@ public class PollCommand {
         withPoll(pollId, player, (poll, p) -> {
             sendMessage(p, "<gold>=== Poll Stats ===</gold>");
             sendMessage(p, "<gray>ID: </gray><white>" + poll.getShortId() + "</white>");
+            if (poll.getCustomId() != null) {
+                sendMessage(p, "<gray>Custom ID: </gray><white>" + poll.getCustomId() + "</white>");
+            }
             sendMessage(p, "<gray>Question: </gray><white>" + poll.getName() + "</white>");
             sendMessage(p, "<gray>Creator: </gray><white>" + poll.getCreatorName() + "</white>");
             sendMessage(p, "<gray>Status: </gray>" + (poll.isActive() ? "<green>Active</green>" : "<red>Inactive</red>"));
@@ -170,22 +175,6 @@ public class PollCommand {
         for (PollManager.Poll poll : playerPolls) {
             String status = poll.isActive() ? "<green>Active</green>" : "<red>Inactive</red>";
             sendMessage(player, "<gray>" + poll.getShortId() + " - </gray>" + status + "<gray> - </gray><white>" + poll.getName() + "</white>");
-        }
-    }
-
-    @Execute(name = "active")
-    public void listActive(@Context Player player) {
-        List<PollManager.Poll> activePolls = PollManager.getActivePolls();
-        
-        if (activePolls.isEmpty()) {
-            sendMessage(player, "<gray>No active polls on the server.</gray>");
-            return;
-        }
-        
-        sendMessage(player, "<gold>=== Active Server Polls ===</gold>");
-        for (PollManager.Poll poll : activePolls) {
-            long timeLeft = (poll.getEndTime() - System.currentTimeMillis()) / 1000;
-            sendMessage(player, "<gray>" + poll.getShortId() + " - </gray><white>" + poll.getName() + "</white><dark_gray> (</dark_gray><white>" + timeLeft + "s left</white><dark_gray>)</dark_gray>");
         }
     }
 }

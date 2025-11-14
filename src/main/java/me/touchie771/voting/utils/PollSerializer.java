@@ -72,13 +72,14 @@ public class PollSerializer {
         }
     }
 
-    public record PollData(UUID id, String name, long duration, UUID creatorId, String creatorName,
+    public record PollData(UUID id, String customId, String name, long duration, UUID creatorId, String creatorName,
                            List<String> options, Map<UUID, Integer> votes, boolean active, long startTime,
                            long endTime) {
 
         public static PollData fromPoll(PollManager.Poll poll) {
                 return new PollData(
                         poll.getId(),
+                        poll.getCustomId(),
                         poll.getName(),
                         poll.getDuration(),
                         poll.getCreatorId(),
