@@ -75,6 +75,10 @@ public abstract class PollManager {
                 .toList();
     }
 
+    public static List<Poll> getAllPolls() {
+        return new ArrayList<>(pollSet);
+    }
+
     public static boolean startPoll(String pollId) {
         Optional<Poll> pollOpt = getPollById(pollId);
         if (pollOpt.isPresent()) {
